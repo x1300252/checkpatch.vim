@@ -1,13 +1,53 @@
 " ---------------------------
 " Show lines in quickfix
 " ---------------------------
+function! s:merge_checkpatch_output(lines) abort
+    let l:merged = []
+    let l:last_msg = ''
+    let l:last_type = ''
+    let l:insert = 0
+
+    for l:line in a:lines
+        if empty(trim(l:line))
+            let l:insert = 0
+        elseif l:line =~#'^ERROR:'
+            let l:last_type = 'ERROR'
+            let l:last_msg = substitute(l:line, '^ERROR: *', '', '')
+        elseif l:line =~#'^WARNING:'
+            let l:last_type = 'WARNING'
+            let l:last_msg = substitute(l:line, '^WARNING: *', '', '')
+        elseif l:line =~#'^CHECK:'
+            let l:last_type = 'CHECK'
+            let l:last_msg = substitute(l:line, '^CHECK: *', '', '')
+        elseif l:line =~#'^#\d\+:'
+            " parse file name and line number
+            let l:matches = matchlist(l:line, '^#\(\d\+\): FILE: \(.*\):\(\d\+\):')
+            if len(l:matches) >= 4
+                let l:line_num = l:matches[3]
+                let l:file = l:matches[2]
+                call add(l:merged, l:file . ':' . l:line_num . ': <' . l:last_type . '> ' . l:last_msg)
+            else
+                call add(l:merged, '<' . l:last_type . '> ' . l:last_msg)
+            endif
+            let l:last_msg = ''
+            let l:last_type = ''
+            let l:insert = 1
+        elseif l:insert == 1
+            call add(l:merged, l:line)
+        endif
+    endfor
+
+    return l:merged
+endfunction
+
 function! s:show_in_quickfix(lines) abort
-    if empty(a:lines)
+    let l:merged = s:merge_checkpatch_output(a:lines)
+    if empty(l:merged)
         echo "checkpatch: no messages"
         return
     endif
 
-    call setqflist([], 'r', {'lines': a:lines})
+    call setqflist([], 'r', {'lines': l:merged})
     let l:qfh = float2nr(winheight(0) * 0.25)
     execute 'copen' l:qfh
 endfunction
