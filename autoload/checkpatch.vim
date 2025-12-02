@@ -134,7 +134,7 @@ function! checkpatch#run_checkpatch_changes() abort
     let l:staged   = system('git diff --cached')
     let l:unstaged = system('git diff')
 
-    let l:diff_patch = l:staged . "\n" . l:unstaged
+    let l:diff_patch = l:staged . l:unstaged
 
     if empty(l:diff_patch)
         echo "checkpatch: no changes to check"
