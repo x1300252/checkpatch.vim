@@ -26,5 +26,5 @@ let g:checkpatch_user_flags = '--strict'
 :CheckpatchCommits HEAD^
 ```
 ### Quickfix Navigation
-- Quickfix will show merged messages in `filename:line: <type> message` format.
+- Quickfix will show merged messages in `filename|line number| type: message` format.
 - Supports jump to the specific line by pressing Enter on a quickfix entry.
