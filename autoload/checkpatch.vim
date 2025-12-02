@@ -97,7 +97,7 @@ endfunction
 " ---------------------------
 function! s:resolve_checkpatch_path() abort
     " use project's checkpatch.pl by default
-    let l:cp = system('git ls-files *checkpatch.pl')
+    let l:cp = trim(system('git ls-files *checkpatch.pl'))
     if !empty(l:cp)
         return fnamemodify(expand(l:cp), ':p')
     endif
