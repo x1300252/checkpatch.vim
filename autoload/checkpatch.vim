@@ -16,7 +16,7 @@ function! s:checkpatch_quickfix_fmt(info) abort
     return l:result
 endfunction
 
-function! s:parse_checkpatch_output(lines) abort
+function! s:parse_checkpatch_output(lines, info) abort
     let l:pattern = '\v^(.+):(\d+):\s*(ERROR|WARNING|CHECK):\s*(.*)$'
     let l:out = []
 
@@ -30,10 +30,13 @@ function! s:parse_checkpatch_output(lines) abort
             let l:type = ''
             if l:match[3] ==# 'ERROR'
                 let l:type = 'E'
+                let a:info.e_cnt += 1
             elseif l:match[3] ==# 'WARNING'
                 let l:type = 'W'
+                let a:info.w_cnt += 1
             elseif l:match[3] ==# 'CHECK'
                 let l:type = 'C'
+                let a:info.c_cnt += 1
             endif
             call add(l:out, {
                         \ 'filename': l:match[1],
@@ -89,7 +92,7 @@ function! s:run_checkpatch(info, type, input) abort
         let l:out = systemlist(join(l:full_cmd, ' '))
     endif
 
-    let l:out = s:parse_checkpatch_output(l:out)
+    let l:out = s:parse_checkpatch_output(l:out, a:info)
     call setqflist([], 'a', {'id': a:info.qfid, 'items': l:out})
 
     return
@@ -119,16 +122,25 @@ function! s:checkpatch_prepare() abort
     call setqflist([], ' ', {'quickfixtextfunc': 's:checkpatch_quickfix_fmt'})
     let l:info.qfid = getqflist({'id': 0}).id
     let l:info.cp = s:resolve_checkpatch_path()
+    let l:info.e_cnt = 0
+    let l:info.w_cnt = 0
+    let l:info.c_cnt = 0
 
     return l:info
 endfunction
 
-function! s:checkpatch_show() abort
+function! s:checkpatch_show(info) abort
+    let l:cnt = "checkpatch.vim: " .
+                \ a:info.e_cnt . " errors, " .
+                \ a:info.w_cnt . " warnings, " .
+                \ a:info.c_cnt . " checks"
+
+    echo l:cnt
     if len(getqflist({'id': a:info.qfid, 'items': 1}).items) == 0
-        echo l:cnt
         return
     endif
 
+    call setqflist([], 'a', {'id': a:info.qfid, 'title': l:cnt})
     execute 'cclose'
     let l:qfh = float2nr(winheight(0) * 0.25)
     if l:qfh < 10
@@ -167,7 +179,7 @@ function! checkpatch#run_checkpatch_files(...) abort
         call s:run_checkpatch(l:info, l:type, l:f)
     endfor
 
-    call s:checkpatch_show()
+    call s:checkpatch_show(l:info)
 endfunction
 
 " ---------------------------
@@ -188,7 +200,7 @@ function! checkpatch#run_checkpatch_changes() abort
     endif
 
     call s:run_checkpatch(l:info, 'stdin', l:diff_patch)
-    call s:checkpatch_show()
+    call s:checkpatch_show(l:info)
 endfunction
 
 " ---------------------------
@@ -200,5 +212,5 @@ function! checkpatch#run_checkpatch_commits(...) abort
     let l:range = (a:0 > 0 && !empty(a:1)) ? a:1 : 'HEAD'
 
     call s:run_checkpatch(l:info, 'git', l:range)
-    call s:checkpatch_show()
+    call s:checkpatch_show(l:info)
 endfunction
