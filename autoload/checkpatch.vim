@@ -3,17 +3,13 @@
 " ---------------------------
 function! s:merge_checkpatch_output(lines) abort
     let l:merged = []
-    let l:insert = 0
 
     for l:line in a:lines
         if empty(trim(l:line))
-            let l:insert = 0
-        elseif l:line =~# '^\(\S\+\)\?:\d\+: \(ERROR\|WARNING\|CHECK\):'
-            call add(l:merged, l:line)
-            let l:insert = 1
-        elseif l:insert == 1
-            call add(l:merged, l:line)
+            continue
         endif
+
+        call add(l:merged, l:line)
     endfor
 
     return l:merged
@@ -40,7 +36,7 @@ function! s:run_checkpatch(cp, type, input) abort
         return []
     endif
 
-    let l:flags = ['--showfile']
+    let l:flags = ['--showfile', '--quiet', '--no-summary']
 
     " Add user flags if any
     if !empty(g:user_checkpatch_flags)
