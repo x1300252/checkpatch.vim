@@ -1,15 +1,59 @@
-function! s:merge_checkpatch_output(lines) abort
-    let l:merged = []
+function! s:checkpatch_quickfix_fmt(info) abort
+    let l:qflist = getqflist({'id' : a:info.id, 'items' : 1}).items
+    let l:result = []
+
+    for l:i in l:qflist
+        let l:line = ''
+        if l:i.valid == 0
+            let l:line = printf('|| %s', l:i.text)
+        else
+            let l:i.filename = bufname(l:i.bufnr)
+            let l:line = printf('%s %s|%d| %s', l:i.type, l:i.filename, l:i.lnum, l:i.text)
+        endif
+        call add(l:result, l:line)
+    endfor
+
+    return l:result
+endfunction
+
+function! s:parse_checkpatch_output(lines) abort
+    let l:pattern = '\v^(.+):(\d+):\s*(ERROR|WARNING|CHECK):\s*(.*)$'
+    let l:out = []
 
     for l:line in a:lines
         if empty(trim(l:line))
             continue
         endif
 
-        call add(l:merged, l:line)
+        if l:line =~# l:pattern
+            let l:match = matchlist(l:line, l:pattern)
+            let l:type = ''
+            if l:match[3] ==# 'ERROR'
+                let l:type = 'E'
+            elseif l:match[3] ==# 'WARNING'
+                let l:type = 'W'
+            elseif l:match[3] ==# 'CHECK'
+                let l:type = 'C'
+            endif
+            call add(l:out, {
+                        \ 'filename': l:match[1],
+                        \ 'lnum': l:match[2],
+                        \ 'type': l:type,
+                        \ 'text': l:match[4],
+                        \ 'valid': 1
+                        \ })
+
+        else
+            call add(l:out, {
+                        \ 'text': l:line,
+                        \ 'valid': 0
+                        \ })
+        endif
+
+        call add(l:out, l:line)
     endfor
 
-    return l:merged
+    return l:out
 endfunction
 
 " ---------------------------
@@ -45,8 +89,8 @@ function! s:run_checkpatch(info, type, input) abort
         let l:out = systemlist(join(l:full_cmd, ' '))
     endif
 
-    let l:merged = s:merge_checkpatch_output(l:out)
-    call setqflist([], 'a', {'id': a:info.qfid, 'lines': l:merged})
+    let l:out = s:parse_checkpatch_output(l:out)
+    call setqflist([], 'a', {'id': a:info.qfid, 'items': l:out})
 
     return
 endfunction
@@ -72,7 +116,7 @@ endfunction
 function! s:checkpatch_prepare() abort
     let l:info = {}
 
-    call setqflist([], ' ')
+    call setqflist([], ' ', {'quickfixtextfunc': 's:checkpatch_quickfix_fmt'})
     let l:info.qfid = getqflist({'id': 0}).id
     let l:info.cp = s:resolve_checkpatch_path()
 
@@ -80,9 +124,25 @@ function! s:checkpatch_prepare() abort
 endfunction
 
 function! s:checkpatch_show() abort
+    if len(getqflist({'id': a:info.qfid, 'items': 1}).items) == 0
+        echo l:cnt
+        return
+    endif
+
     execute 'cclose'
     let l:qfh = float2nr(winheight(0) * 0.25)
+    if l:qfh < 10
+        let l:qfh = 10
+    endif
     execute 'botright copen' l:qfh
+
+    highlight CheckPatchError ctermfg=red ctermbg=none cterm=bold
+    highlight CheckPatchWarn ctermfg=yellow ctermbg=none cterm=bold
+    highlight CheckPatchCheck ctermfg=green ctermbg=none cterm=bold
+
+    call matchadd('CheckPatchError', '^E\s')
+    call matchadd('CheckPatchWarn', '^W\s')
+    call matchadd('CheckPatchCheck', '^C\s')
 endfunction
 
 " ---------------------------
